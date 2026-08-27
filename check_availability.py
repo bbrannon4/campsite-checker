@@ -39,6 +39,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                    help="path to the campground CSV")
     p.add_argument("--delay", type=float, default=1.0,
                    help="seconds to wait between network requests")
+    p.add_argument("--format", choices=("grid", "md", "csv"), default="grid",
+                   help="table style: grid (box-drawing), md (markdown), or csv")
     p.add_argument("--detail", action="store_true",
                    help="also print each open site with a direct booking link")
     return p.parse_args(argv)
@@ -48,61 +50,107 @@ def _col_header(night: dt.date) -> str:
     return f"{_DOW[night.weekday()]} {night.month}/{night.day:02d}"
 
 
-def format_matrix(
-    results: list[CampgroundResult], checkins: list[dt.date], stay_length: int
-) -> str:
-    """Rows = campgrounds, columns = check-in dates, cell = # of reservable
-    sites open for the whole stay starting that date (blank for none)."""
-    lines: list[str] = []
-    span = ""
-    if checkins:
-        last_out = (checkins[-1] + dt.timedelta(days=stay_length)).isoformat()
-        span = f"{checkins[0].isoformat()} → {last_out}"
-    stay = f"{stay_length}-night stay" if stay_length != 1 else "1-night stay"
-    lines.append(f"Reservable availability, {stay} (first-come-first-serve "
-                 f"excluded) — {span}")
-    lines.append("Columns = check-in date. Cells = # of sites open for the "
-                 "whole stay; blank = none.\n")
+def _matrix_data(
+    results: list[CampgroundResult], checkins: list[dt.date]
+) -> tuple[list[str], list[list[str]], list[str]]:
+    """Return (headers, rows, errors) as plain strings, format-agnostic.
 
-    headers = [_col_header(n) for n in checkins]
-    label_w = max([len("Campground")] + [len(r.campground.name) for r in results])
-    col_w = [max(len(h), 3) for h in headers]
-
-    # header row
-    row = "Campground".ljust(label_w)
-    for h, w in zip(headers, col_w):
-        row += "  " + h.rjust(w)
-    lines.append(row)
-    lines.append("-" * len(row))
-
+    rows[i] = [campground name, cell, cell, ...] aligned to headers[1:].
+    """
+    headers = ["Campground"] + [_col_header(n) for n in checkins]
+    rows: list[list[str]] = []
     errors: list[str] = []
     for res in results:
         name = res.campground.name
         if res.error:
             errors.append(f"{name}: {res.error}")
-            row = name.ljust(label_w)
-            for w in col_w:
-                row += "  " + "err".rjust(w)
-            lines.append(row)
+            rows.append([name] + ["err"] * len(checkins))
             continue
-
         counts = {n: 0 for n in checkins}
         for site in res.open_sites:
             if site.night in counts:
                 counts[site.night] += 1
+        rows.append([name] + [(str(counts[n]) if counts[n] else "") for n in checkins])
+    return headers, rows, errors
 
-        row = name.ljust(label_w)
-        for n, w in zip(checkins, col_w):
-            c = counts[n]
-            row += "  " + (str(c) if c else "").rjust(w)
-        lines.append(row)
 
+def _title(checkins: list[dt.date], stay_length: int) -> str:
+    span = ""
+    if checkins:
+        last_out = (checkins[-1] + dt.timedelta(days=stay_length)).isoformat()
+        span = f"{checkins[0].isoformat()} → {last_out}"
+    stay = f"{stay_length}-night stay" if stay_length != 1 else "1-night stay"
+    return f"Reservable availability, {stay} (first-come-first-serve excluded) — {span}"
+
+
+def _render_grid(headers: list[str], rows: list[list[str]]) -> str:
+    """A box-drawing table. Column 0 left-aligned, count columns right-aligned."""
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            widths[i] = max(widths[i], len(cell))
+
+    def cell(text: str, i: int) -> str:
+        return text.ljust(widths[i]) if i == 0 else text.rjust(widths[i])
+
+    def border(left: str, mid: str, right: str) -> str:
+        return left + mid.join("─" * (w + 2) for w in widths) + right
+
+    def data_row(cells: list[str]) -> str:
+        return "│ " + " │ ".join(cell(c, i) for i, c in enumerate(cells)) + " │"
+
+    out = [border("┌", "┬", "┐"), data_row(headers), border("├", "┼", "┤")]
+    out += [data_row(r) for r in rows]
+    out.append(border("└", "┴", "┘"))
+    return "\n".join(out)
+
+
+def _render_md(headers: list[str], rows: list[list[str]]) -> str:
+    def line(cells: list[str]) -> str:
+        return "| " + " | ".join(cells) + " |"
+
+    # left-align the name column, right-align the count columns
+    sep = ["---"] + ["--:"] * (len(headers) - 1)
+    out = [line(headers), line(sep)] + [line(r) for r in rows]
+    return "\n".join(out)
+
+
+def _render_csv(headers: list[str], rows: list[list[str]]) -> str:
+    import csv as _csv
+    import io
+
+    buf = io.StringIO()
+    w = _csv.writer(buf)
+    w.writerow(headers)
+    w.writerows(rows)
+    return buf.getvalue().rstrip("\n")
+
+
+_RENDERERS = {"grid": _render_grid, "md": _render_md, "csv": _render_csv}
+
+
+def format_matrix(
+    results: list[CampgroundResult],
+    checkins: list[dt.date],
+    stay_length: int,
+    fmt: str = "grid",
+) -> str:
+    headers, rows, errors = _matrix_data(results, checkins)
+    table = _RENDERERS[fmt](headers, rows)
+    if fmt == "csv":  # keep csv output clean/importable
+        return table
+
+    parts = [
+        _title(checkins, stay_length),
+        "Columns = check-in date. Cells = # of sites open for the whole stay; "
+        "blank = none.",
+        "",
+        table,
+    ]
     if errors:
-        lines.append("")
-        for e in errors:
-            lines.append(f"  ! {e}")
-
-    return "\n".join(lines)
+        parts.append("")
+        parts += [f"  ! {e}" for e in errors]
+    return "\n".join(parts)
 
 
 def format_detail(results: list[CampgroundResult]) -> str:
@@ -167,7 +215,7 @@ def main(argv: list[str] | None = None) -> int:
     results = check_all(
         campgrounds, checkins, stay_length=args.nights, delay_seconds=args.delay
     )
-    print(format_matrix(results, checkins, args.nights))
+    print(format_matrix(results, checkins, args.nights, fmt=args.format))
     if args.detail:
         print(format_detail(results))
     return 0

@@ -22,16 +22,21 @@ from providers import (
 
 @dataclass(frozen=True)
 class OpenSite:
-    """One bookable site on one night."""
+    """One bookable site available for a full stay starting on `night`."""
 
     campground: Campground
-    night: dt.date          # check-in date (the night you'd be staying)
+    night: dt.date          # check-in date (first night of the stay)
+    stay_length: int        # number of consecutive nights this site is open for
     site_label: str
     site_id: str
     loop: str
     site_type: str
     max_length: int
     campsite_url: str
+
+    @property
+    def checkout(self) -> dt.date:
+        return self.night + dt.timedelta(days=self.stay_length)
 
 
 @dataclass
@@ -48,34 +53,56 @@ class CampgroundResult:
             self.open_sites = []
 
 
-def target_nights(weeks: int, weekends_only: bool, today: dt.date | None = None) -> list[dt.date]:
-    """Every check-in night to examine, from today through `weeks` weeks out.
+_WEEKEND_NIGHTS = (4, 5)  # a "weekend night" is a Friday or Saturday night
 
-    weekends-only keeps Friday and Saturday check-ins (i.e. Fri->Sat and
-    Sat->Sun nights), which is what "weekend stays" means for a nightly system.
+
+def target_checkins(
+    weeks: int,
+    weekends_only: bool,
+    stay_length: int,
+    today: dt.date | None = None,
+) -> list[dt.date]:
+    """Check-in dates to examine, from today through `weeks` weeks out.
+
+    A stay is a run of `stay_length` consecutive nights beginning on the
+    check-in date. With weekends_only, a check-in qualifies only if *every*
+    night of the stay is a Friday or Saturday night. So a 2-night weekend stay
+    is Friday check-in (Fri+Sat); a 1-night weekend stay is Friday or Saturday.
+    (A 3-night all-weekend stay is impossible and yields nothing.)
     """
     today = today or dt.date.today()
     end = today + dt.timedelta(weeks=weeks)
-    nights: list[dt.date] = []
+    checkins: list[dt.date] = []
     day = today
     while day < end:
-        if not weekends_only or day.weekday() in (4, 5):  # Fri=4, Sat=5
-            nights.append(day)
+        stay = [day + dt.timedelta(days=i) for i in range(stay_length)]
+        if not weekends_only or all(d.weekday() in _WEEKEND_NIGHTS for d in stay):
+            checkins.append(day)
         day += dt.timedelta(days=1)
-    return nights
+    return checkins
 
 
-def _months_for(nights: list[dt.date]) -> list[tuple[int, int]]:
-    seen = {(n.year, n.month) for n in nights}
+def _stay_dates(checkin: dt.date, stay_length: int) -> list[dt.date]:
+    return [checkin + dt.timedelta(days=i) for i in range(stay_length)]
+
+
+def _months_for(checkins: list[dt.date], stay_length: int) -> list[tuple[int, int]]:
+    # A stay can spill into the next month, so cover every night of every stay.
+    seen: set[tuple[int, int]] = set()
+    for c in checkins:
+        for d in _stay_dates(c, stay_length):
+            seen.add((d.year, d.month))
     return sorted(seen)
 
 
 def check_campground(
     provider: Provider,
     campground: Campground,
-    nights: list[dt.date],
+    checkins: list[dt.date],
+    stay_length: int = 1,
 ) -> CampgroundResult:
-    """Fetch the months this campground needs, then collect open sites."""
+    """Fetch the months this campground needs, then collect sites open for the
+    full `stay_length`-night stay beginning on each check-in date."""
     result = CampgroundResult(
         campground=campground,
         campground_url=provider.campground_url(campground.facility_id),
@@ -84,25 +111,36 @@ def check_campground(
     try:
         months = {
             (y, m): provider.get_month(campground.facility_id, y, m)
-            for (y, m) in _months_for(nights)
+            for (y, m) in _months_for(checkins, stay_length)
         }
     except ProviderError as exc:
         result.error = str(exc)
         return result
 
-    for night in nights:
-        month = months.get((night.year, night.month))
-        if month is None:
+    def available_on(site_id: str, day: dt.date) -> bool:
+        # Only STATUS_AVAILABLE counts: online-reservable AND open. First-come-
+        # first-serve nights never carry this status, so they are excluded here.
+        month = months.get((day.year, day.month))
+        return month is not None and month.status(site_id, day) == STATUS_AVAILABLE
+
+    for checkin in checkins:
+        stay = _stay_dates(checkin, stay_length)
+        checkin_month = months.get((checkin.year, checkin.month))
+        if checkin_month is None:
             continue
-        for site_id, site in month.sites.items():
-            if month.status(site_id, night) != STATUS_AVAILABLE:
+        for site_id, site in checkin_month.sites.items():
+            if not site.is_overnight:
                 continue
             if campground.max_length and site.max_length and site.max_length < campground.max_length:
+                continue
+            # The same site must be open every night of the stay.
+            if not all(available_on(site_id, d) for d in stay):
                 continue
             result.open_sites.append(
                 OpenSite(
                     campground=campground,
-                    night=night,
+                    night=checkin,
+                    stay_length=stay_length,
                     site_label=site.label,
                     site_id=site_id,
                     loop=site.loop,
@@ -118,7 +156,8 @@ def check_campground(
 
 def check_all(
     campgrounds: list[Campground],
-    nights: list[dt.date],
+    checkins: list[dt.date],
+    stay_length: int = 1,
     delay_seconds: float = 1.0,
 ) -> list[CampgroundResult]:
     """Check every campground, reusing one provider instance per provider key
@@ -135,6 +174,6 @@ def check_all(
         except ProviderError as exc:
             results.append(CampgroundResult(campground=cg, error=str(exc)))
             continue
-        results.append(check_campground(provider, cg, nights))
+        results.append(check_campground(provider, cg, checkins, stay_length))
 
     return results

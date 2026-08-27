@@ -15,18 +15,55 @@ pip install -r requirements.txt
 
 ## Usage
 
+A bare run checks the **next two weeks** for a **two-night weekend stay**:
+
 ```bash
-python check_availability.py --weeks 4 --weekends-only
+python check_availability.py
 ```
+
+Output is a matrix — one row per campground, one column per check-in date,
+each cell the number of reservable sites open for the *whole* stay (blank =
+none). First-come-first-serve and day-use sites are never counted.
+
+```
+Reservable availability, 2-night stay (first-come-first-serve excluded) — 2026-08-28 → 2026-10-04
+Columns = check-in date. Cells = # of sites open for the whole stay; blank = none.
+
+Campground   Fri 8/28  Fri 9/04  Fri 9/11  Fri 9/18  Fri 9/25  Fri 10/02
+------------------------------------------------------------------------
+Arapaho Bay                             6        10
+```
+
+Add `--detail` to also list each open site with a direct booking link.
 
 Options:
 
 | flag | meaning | default |
 | --- | --- | --- |
-| `--weeks N` | how many weeks ahead to check, from today | `4` |
-| `--weekends-only` | only Friday & Saturday check-in nights | off |
+| `--weeks N` | how many weeks ahead to check, from today | `2` |
+| `--nights N` | length of stay — consecutive nights the *same* site must be open | `2` |
+| `--weekends-only` / `--no-weekends-only` | restrict to weekend stays (see below) | on |
+| `--detail` | also print each open site + booking link | off |
 | `--sites PATH` | path to the campground CSV | `campsites.csv` |
 | `--delay SECONDS` | pause between network requests (be polite) | `1.0` |
+
+**Length of stay matters.** A cell counts only sites open for *every* night of
+the stay, so "site A open Fri, site B open Sat" is not the same as "one site
+open both nights" — only the latter counts for `--nights 2`.
+
+**What "weekend" means.** A weekend night is a Friday or Saturday night, and a
+weekend stay is one where *every* night is a weekend night. So a 2-night weekend
+stay is a **Friday check-in** (Fri+Sat); a 1-night weekend stay is Friday *or*
+Saturday. (A 3-plus-night all-weekend stay can't fit inside Fri/Sat and returns
+nothing — use `--no-weekends-only` for longer trips.)
+
+Examples:
+
+```bash
+python check_availability.py --weeks 4                 # 4 wks, 2-night weekends
+python check_availability.py --nights 1                # single weekend nights
+python check_availability.py --nights 3 --no-weekends-only   # any 3-night stay
+```
 
 ## The campground list (`campsites.csv`)
 

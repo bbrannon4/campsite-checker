@@ -30,6 +30,7 @@ class Site:
     loop: str = ""        # loop/area name if the provider exposes one
     site_type: str = ""   # e.g. "STANDARD NONELECTRIC", "TENT ONLY"
     max_length: int = 0   # max RV/trailer length in feet, 0 if unknown/unlimited
+    is_overnight: bool = True  # False for day-use sites, which we never count
 
 
 @dataclass

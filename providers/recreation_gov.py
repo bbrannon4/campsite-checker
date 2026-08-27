@@ -31,13 +31,17 @@ _API = "https://www.recreation.gov/api/camps/availability/campground/{facility_i
 _WEB = "https://www.recreation.gov"
 
 # recreation.gov's per-night availability vocabulary -> normalized status.
+# Only "Available" is online-reservable AND open. First-come/walk-up nights show
+# as "Open" and map to UNAVAILABLE, so counting STATUS_AVAILABLE alone already
+# excludes first-come-first-serve.
 _STATUS_MAP = {
     "Available": STATUS_AVAILABLE,
     "Reserved": STATUS_BOOKED,
     "Not Available": STATUS_UNAVAILABLE,
     "Not Reservable": STATUS_UNAVAILABLE,
     "Not Reservable Management": STATUS_UNAVAILABLE,
-    "Open": STATUS_UNAVAILABLE,      # walk-up/first-come, not bookable online
+    "Open": STATUS_UNAVAILABLE,      # walk-up / first-come, not bookable online
+    "Closed": STATUS_UNAVAILABLE,
     "NYR": STATUS_UNAVAILABLE,       # not yet released
     "Lottery": STATUS_UNAVAILABLE,
 }
@@ -116,6 +120,8 @@ class RecreationGovProvider(Provider):
                 loop=str(raw.get("loop") or ""),
                 site_type=str(raw.get("campsite_type") or ""),
                 max_length=max_len,
+                is_overnight=str(raw.get("type_of_use") or "Overnight").lower()
+                != "day",
             )
 
             nights: dict[dt.date, str] = {}

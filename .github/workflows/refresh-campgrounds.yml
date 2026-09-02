@@ -1,0 +1,43 @@
+name: Refresh campground index
+
+# Rebuilds docs/data/campgrounds.json so the web app picks up campgrounds that
+# have opened or closed on recreation.gov. Runs quarterly (every ~3 months) and
+# can also be triggered by hand from the Actions tab. Keyless — no secrets.
+
+on:
+  schedule:
+    - cron: "0 9 1 1,4,7,10 *"   # 09:00 UTC on Jan 1, Apr 1, Jul 1, Oct 1
+  workflow_dispatch:              # manual "Run workflow" button
+
+permissions:
+  contents: write                 # allow the job to commit the refreshed file
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Rebuild campground index
+        run: python scripts/build_campgrounds.py
+
+      - name: Commit if the data changed
+        run: |
+          if git diff --quiet -- docs/data/campgrounds.json; then
+            echo "No changes to campground index."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add docs/data/campgrounds.json
+            git commit -m "Refresh campground index ($(date -u +%Y-%m-%d))"
+            git push
+          fi

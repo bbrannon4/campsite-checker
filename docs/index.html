@@ -10,7 +10,7 @@
 <main>
   <header>
     <h1>Campsite Finder</h1>
-    <p class="tagline">Find recreation.gov campgrounds near you. Enter a ZIP code and choose how far you'll drive.</p>
+    <p class="tagline">Find recreation.gov campgrounds near you, then check weekend availability. Enter a ZIP code and choose how far you'll go.</p>
   </header>
 
   <form id="search-form" class="controls">
@@ -34,12 +34,37 @@
 
   <section id="results" hidden>
     <h2 id="results-head"></h2>
+
+    <div id="avail-panel">
+      <form id="avail-form" class="avail-controls">
+        <div class="avail-field">
+          <label for="weeks">Weeks ahead</label>
+          <input id="weeks" type="number" min="1" max="12" value="2" />
+        </div>
+        <div class="avail-field">
+          <label for="nights">Nights (stay length)</label>
+          <input id="nights" type="number" min="1" max="14" value="2" />
+        </div>
+        <div class="avail-field checkbox">
+          <label><input id="weekends" type="checkbox" checked /> Weekends only</label>
+        </div>
+        <button type="submit" id="check">Check availability</button>
+      </form>
+      <p class="hint" id="avail-note">
+        Checks the reservable campgrounds below directly on recreation.gov. Weekends-only
+        means every night of the stay is a Fri/Sat, so a 2-night weekend stay is a Friday check-in.
+      </p>
+      <p id="avail-status" class="status" role="status" aria-live="polite"></p>
+      <div id="avail-matrix" class="table-scroll"></div>
+    </div>
+
+    <h3 class="list-head">Nearby campgrounds</h3>
     <ol id="results-list" class="cards"></ol>
   </section>
 
   <footer>
-    <p>Unofficial tool. Campground list from recreation.gov; <span id="data-date"></span>.
-       Availability isn't checked here yet — each result links to its recreation.gov page.</p>
+    <p>Unofficial tool. Campground list &amp; availability from recreation.gov; <span id="data-date"></span>.
+       Availability reflects online-reservable sites only (first-come-first-serve excluded) and can change minute to minute.</p>
   </footer>
 </main>
 <script src="app.js"></script>

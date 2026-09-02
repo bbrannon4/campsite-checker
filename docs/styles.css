@@ -117,4 +117,52 @@ button#go:hover { filter: brightness(1.05); }
   border-radius: 999px;
 }
 
+/* availability panel */
+#avail-panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1.1rem 1.25rem;
+  box-shadow: var(--shadow);
+  margin-bottom: 1.5rem;
+}
+.avail-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 1rem 1.25rem;
+}
+.avail-field { display: flex; flex-direction: column; gap: .35rem; }
+.avail-field label { font-size: .82rem; font-weight: 600; color: var(--muted); }
+.avail-field input[type="number"] {
+  width: 6rem; font-size: 1rem; padding: .45rem .55rem;
+  border: 1px solid var(--line); border-radius: 8px; background: #fff;
+}
+.avail-field.checkbox { justify-content: flex-end; }
+.avail-field.checkbox label {
+  flex-direction: row; align-items: center; gap: .4rem;
+  font-size: .95rem; color: var(--ink); font-weight: 500;
+}
+button#check {
+  font-size: .95rem; font-weight: 600; padding: .6rem 1.2rem;
+  color: var(--accent-ink); background: var(--accent);
+  border: none; border-radius: 8px; cursor: pointer; height: fit-content;
+}
+button#check:hover { filter: brightness(1.05); }
+button#check:disabled { opacity: .6; cursor: progress; }
+
+.table-scroll { overflow-x: auto; margin-top: .5rem; }
+.matrix-caption { font-size: .85rem; color: var(--muted); margin: .5rem 0 .6rem; }
+table.matrix { border-collapse: collapse; font-size: .9rem; }
+table.matrix th, table.matrix td {
+  border: 1px solid var(--line); padding: .4rem .55rem; text-align: center; white-space: nowrap;
+}
+table.matrix thead th { background: var(--badge); font-weight: 600; color: var(--ink); line-height: 1.2; }
+table.matrix th.cg, table.matrix td.cg { text-align: left; }
+table.matrix td.cg a { color: var(--accent); text-decoration: none; }
+table.matrix td.cg a:hover { text-decoration: underline; }
+table.matrix td.open { background: var(--badge); font-weight: 700; color: var(--accent); }
+
+.list-head { font-size: 1rem; color: var(--muted); margin: .5rem .25rem; }
+
 footer { margin-top: 2.5rem; font-size: .8rem; color: var(--muted); }

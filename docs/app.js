@@ -102,7 +102,7 @@ async function runSearch(evt) {
 function render(origin, radius, nearby) {
   els.head.textContent =
     `${nearby.length} campground${nearby.length === 1 ? "" : "s"} within ` +
-    `${radius} mi of ${origin.label}`;
+    `${radius} mi (straight-line) of ${origin.label}`;
   els.list.innerHTML = "";
 
   if (!nearby.length) {
@@ -124,7 +124,7 @@ function render(origin, radius, nearby) {
         ${c.parent ? `<div class="card-sub">${escapeHtml(c.parent)}</div>` : ""}
       </div>
       <div class="card-meta">
-        <span class="miles">${c.miles.toFixed(0)} mi</span>
+        <span class="miles" title="straight-line distance, not driving">${c.miles.toFixed(0)} mi</span>
         <span class="sites">${c.sites} sites</span>
         ${c.reservable ? `<span class="badge">reservable</span>` : ""}
       </div>`;

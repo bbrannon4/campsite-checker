@@ -61,6 +61,7 @@ input#zip:focus, input[type="range"]:focus-visible {
 
 input[type="range"] { width: 100%; accent-color: var(--accent); margin: .3rem 0 0; }
 .range-ends { display: flex; justify-content: space-between; font-size: .72rem; color: var(--muted); }
+.hint { font-size: .72rem; color: var(--muted); margin-top: .35rem; font-style: italic; }
 #radius-out { font-weight: 700; color: var(--ink); }
 
 button#go {

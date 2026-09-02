@@ -21,9 +21,10 @@
     </div>
 
     <div class="field">
-      <label for="radius">Within <output id="radius-out">50</output> miles</label>
+      <label for="radius">Search radius: <output id="radius-out">50</output> mi</label>
       <input id="radius" name="radius" type="range" min="5" max="150" step="5" value="50" />
       <div class="range-ends"><span>5</span><span>150</span></div>
+      <div class="hint">straight-line distance (as the crow flies), not driving</div>
     </div>
 
     <button type="submit" id="go">Search</button>

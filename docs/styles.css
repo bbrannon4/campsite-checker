@@ -151,6 +151,17 @@ button#check {
 button#check:hover { filter: brightness(1.05); }
 button#check:disabled { opacity: .6; cursor: progress; }
 
+.view-toggle { display: inline-flex; margin: .25rem 0 .75rem; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.view-toggle button {
+  font-size: .9rem; font-weight: 600; padding: .4rem 1rem; border: none; cursor: pointer;
+  background: var(--card); color: var(--muted);
+}
+.view-toggle button + button { border-left: 1px solid var(--line); }
+.view-toggle button.active { background: var(--accent); color: var(--accent-ink); }
+
+#avail-map { height: 460px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+#avail-map .leaflet-container { height: 100%; width: 100%; font: inherit; }
+
 .table-scroll { overflow-x: auto; margin-top: .5rem; }
 .matrix-caption { font-size: .85rem; color: var(--muted); margin: .5rem 0 .6rem; }
 table.matrix { border-collapse: collapse; font-size: .9rem; }

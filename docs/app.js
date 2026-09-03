@@ -27,10 +27,18 @@ const els = {
   check: document.getElementById("check"),
   availStatus: document.getElementById("avail-status"),
   availMatrix: document.getElementById("avail-matrix"),
+  viewToggle: document.getElementById("view-toggle"),
+  tabTable: document.getElementById("tab-table"),
+  tabMap: document.getElementById("tab-map"),
+  availMap: document.getElementById("avail-map"),
 };
 
 let campgrounds = [];        // loaded once
 let lastNearby = [];         // most recent search results (with .miles)
+let lastOrigin = null;       // {lat,lng,label} of the searched ZIP
+let lastAvail = null;        // { checkins, stay, rows:[{c,counts}] } with openings
+let mapObj = null;           // Leaflet map instance (built lazily)
+let markersLayer = null;     // current marker layer group
 const geoCache = new Map();  // zip -> {lat,lng,label}
 const monthCache = new Map();// `${id}-${y}-${m}` -> parsed month
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -110,6 +118,7 @@ async function runSearch(evt) {
   }
   nearby.sort((a, b) => a.miles - b.miles);
   lastNearby = nearby;
+  lastOrigin = origin;
   renderNearby(origin, radius, nearby);
 }
 
@@ -309,6 +318,9 @@ function renderMatrix(checkins, stay, weekendsOnly, rows, checked, totalReservab
     if (notes.length) html += `<div class="hint">${notes.join(" ")}</div>`;
     els.availMatrix.innerHTML = html;
     setStatus(els.availStatus, "", "");
+    lastAvail = null;
+    els.viewToggle.hidden = true;
+    showTable();
     return;
   }
 
@@ -332,6 +344,70 @@ function renderMatrix(checkins, stay, weekendsOnly, rows, checked, totalReservab
   html += `<div class="hint">${notes.join(" ")}</div>`;
   els.availMatrix.innerHTML = html;
   setStatus(els.availStatus, "", "");
+
+  lastAvail = { checkins, stay, rows: hasAny };
+  els.viewToggle.hidden = false;
+  showTable(); // default to the table each run; user can switch to the map
+}
+
+// --- map view --------------------------------------------------------------
+function showTable() {
+  els.availMatrix.hidden = false;
+  els.availMap.hidden = true;
+  els.tabTable.classList.add("active");
+  els.tabTable.setAttribute("aria-pressed", "true");
+  els.tabMap.classList.remove("active");
+  els.tabMap.setAttribute("aria-pressed", "false");
+}
+
+function showMap() {
+  els.availMatrix.hidden = true;
+  els.availMap.hidden = false;
+  els.tabMap.classList.add("active");
+  els.tabMap.setAttribute("aria-pressed", "true");
+  els.tabTable.classList.remove("active");
+  els.tabTable.setAttribute("aria-pressed", "false");
+  buildMap();
+}
+
+function buildMap() {
+  if (typeof L === "undefined" || !lastAvail) return;
+  if (!mapObj) {
+    mapObj = L.map(els.availMap);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 17,
+      attribution: "&copy; OpenStreetMap contributors",
+    }).addTo(mapObj);
+  }
+  if (markersLayer) markersLayer.remove();
+  markersLayer = L.layerGroup().addTo(mapObj);
+
+  const pts = [];
+  if (lastOrigin) {
+    L.circleMarker([lastOrigin.lat, lastOrigin.lng], {
+      radius: 7, color: "#1d4ed8", fillColor: "#3b82f6", fillOpacity: 1, weight: 2,
+    }).bindPopup(`Your ZIP — ${escapeHtml(lastOrigin.label)}`).addTo(markersLayer);
+    pts.push([lastOrigin.lat, lastOrigin.lng]);
+  }
+
+  for (const r of lastAvail.rows) {
+    const c = r.c;
+    const openLines = lastAvail.checkins
+      .filter((d) => r.counts[fmtDate(d)] > 0)
+      .map((d) => `${DOW[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}: ${r.counts[fmtDate(d)]} site(s)`)
+      .join("<br>");
+    L.circleMarker([c.lat, c.lng], {
+      radius: 8, color: "#215c3e", fillColor: "#2f6f4e", fillOpacity: 0.9, weight: 2,
+    }).bindPopup(
+      `<strong>${escapeHtml(c.name)}</strong><br>${c.miles.toFixed(0)} mi (straight-line)<br>` +
+      `${openLines}<br><a href="${REC_GOV}${c.id}" target="_blank" rel="noopener">Book on recreation.gov</a>`
+    ).addTo(markersLayer);
+    pts.push([c.lat, c.lng]);
+  }
+
+  if (pts.length) mapObj.fitBounds(pts, { padding: [30, 30], maxZoom: 11 });
+  // The container was hidden until now; let Leaflet recompute its size.
+  setTimeout(() => mapObj.invalidateSize(), 0);
 }
 
 // --- utilities -------------------------------------------------------------
@@ -352,4 +428,6 @@ function escapeHtml(s) {
 els.radius.addEventListener("input", () => { els.radiusOut.textContent = els.radius.value; });
 els.form.addEventListener("submit", runSearch);
 els.availForm.addEventListener("submit", runAvailability);
+els.tabTable.addEventListener("click", showTable);
+els.tabMap.addEventListener("click", showMap);
 loadData();

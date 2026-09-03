@@ -4,7 +4,8 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Campsite Finder</title>
-<link rel="stylesheet" href="styles.css?v=3" />
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+<link rel="stylesheet" href="styles.css?v=5" />
 </head>
 <body>
 <main>
@@ -55,7 +56,12 @@
         means every night of the stay is a Fri/Sat, so a 2-night weekend stay is a Friday check-in.
       </p>
       <p id="avail-status" class="status" role="status" aria-live="polite"></p>
+      <div id="view-toggle" class="view-toggle" hidden>
+        <button type="button" id="tab-table" class="active" aria-pressed="true">Table</button>
+        <button type="button" id="tab-map" aria-pressed="false">Map</button>
+      </div>
       <div id="avail-matrix" class="table-scroll"></div>
+      <div id="avail-map" hidden></div>
     </div>
 
     <h3 class="list-head">All campgrounds in range</h3>
@@ -68,6 +74,7 @@
        Availability reflects online-reservable sites only (first-come-first-serve excluded) and can change minute to minute.</p>
   </footer>
 </main>
-<script src="app.js?v=4"></script>
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

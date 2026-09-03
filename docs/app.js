@@ -6,7 +6,7 @@ const GEOCODE_URL = "https://api.zippopotam.us/us/";  // keyless, CORS-open
 const REC_GOV = "https://www.recreation.gov/camping/campgrounds/";
 const AVAIL_URL = "https://www.recreation.gov/api/camps/availability/campground/";
 const MAX_RESULTS = 200;   // cap the rendered nearby list
-const MAX_CHECK = 40;      // cap how many campgrounds we hit for availability
+const MAX_CHECK = 1000;    // effectively "check all in range"; safety ceiling only
 const FETCH_DELAY_MS = 200; // politeness pause between availability requests
 
 // --- element refs ----------------------------------------------------------
@@ -257,6 +257,10 @@ async function runAvailability(evt) {
 
   els.check.disabled = true;
   els.availMatrix.innerHTML = "";
+  if (targets.length > 50) {
+    els.availMatrix.innerHTML =
+      `<div class="hint">Checking ${targets.length} campgrounds one by one — this can take up to a minute.</div>`;
+  }
   const rows = [];
   for (let i = 0; i < targets.length; i++) {
     const c = targets[i];
@@ -288,8 +292,14 @@ function renderMatrix(checkins, stay, weekendsOnly, rows, checked, totalReservab
     : `${first.getMonth() + 1}/${first.getDate()} – ${last.getMonth() + 1}/${last.getDate()}`;
 
   const notes = [];
-  if (totalReservable > checked) notes.push(`Checked the nearest ${checked} reservable of ${totalReservable} in range.`);
-  if (errored.length) notes.push(`${errored.length} campground(s) couldn't be reached.`);
+  if (totalReservable > checked) {
+    notes.push(`Checked only the nearest ${checked} of ${totalReservable} reservable campgrounds (safety cap ${MAX_CHECK}); farther ones were NOT checked.`);
+  } else {
+    notes.push(`Checked all ${checked} reservable campgrounds in range.`);
+  }
+  if (errored.length) {
+    notes.push(`⚠ ${errored.length} campground(s) couldn't be reached — recreation.gov may be rate-limiting. Re-run in a minute or use a smaller radius; those were NOT included above.`);
+  }
 
   let html = `<div class="matrix-caption">Reservable ${stayLabel} ${mode}stays &mdash; check-in ${span}. Cell = # of sites open for the whole stay.</div>`;
 

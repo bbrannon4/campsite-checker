@@ -275,23 +275,40 @@ async function runAvailability(evt) {
 }
 
 function renderMatrix(checkins, stay, weekendsOnly, rows, checked, totalReservable) {
-  const staySites = new Map(); // only rows with any availability, keep order by distance
   const hasAny = rows.filter((r) => r.counts && Object.values(r.counts).some((n) => n > 0));
   const errored = rows.filter((r) => r.error);
+  const withNone = rows.filter((r) => r.counts && !Object.values(r.counts).some((n) => n > 0)).length;
 
   const stayLabel = stay === 1 ? "1-night" : `${stay}-night`;
   const mode = weekendsOnly ? "weekend " : "";
-  let html = `<div class="matrix-caption">Reservable ${stayLabel} ${mode}stays — check-in dates across ${checkins.length} option(s). Cell = # of sites open for the whole stay.</div>`;
+  const first = checkins[0];
+  const last = checkins[checkins.length - 1];
+  const span = checkins.length === 1
+    ? `${DOW[first.getDay()]} ${first.getMonth() + 1}/${first.getDate()}`
+    : `${first.getMonth() + 1}/${first.getDate()} – ${last.getMonth() + 1}/${last.getDate()}`;
 
+  const notes = [];
+  if (totalReservable > checked) notes.push(`Checked the nearest ${checked} reservable of ${totalReservable} in range.`);
+  if (errored.length) notes.push(`${errored.length} campground(s) couldn't be reached.`);
+
+  let html = `<div class="matrix-caption">Reservable ${stayLabel} ${mode}stays &mdash; check-in ${span}. Cell = # of sites open for the whole stay.</div>`;
+
+  // No openings anywhere: show a clear message, NOT a table full of blank rows.
+  if (!hasAny.length) {
+    html += `<div class="no-openings">No open sites for a ${stayLabel} ${mode}stay in this window — all ${checked} reservable campgrounds checked are booked.</div>`;
+    if (notes.length) html += `<div class="hint">${notes.join(" ")}</div>`;
+    els.availMatrix.innerHTML = html;
+    setStatus(els.availStatus, "", "");
+    return;
+  }
+
+  // Otherwise show only the campgrounds that actually have openings.
   html += `<table class="matrix"><thead><tr><th class="cg">Campground</th>`;
   for (const c of checkins) {
     html += `<th>${DOW[c.getDay()]}<br>${c.getMonth() + 1}/${c.getDate()}</th>`;
   }
   html += `</tr></thead><tbody>`;
-
-  // Show campgrounds that have at least one opening first; then a note for the rest.
-  const shownRows = hasAny.length ? hasAny : rows.filter((r) => r.counts);
-  for (const r of shownRows) {
+  for (const r of hasAny) {
     html += `<tr><td class="cg"><a href="${REC_GOV}${r.c.id}" target="_blank" rel="noopener">${escapeHtml(r.c.name)}</a></td>`;
     for (const c of checkins) {
       const n = r.counts[fmtDate(c)] || 0;
@@ -301,14 +318,8 @@ function renderMatrix(checkins, stay, weekendsOnly, rows, checked, totalReservab
   }
   html += `</tbody></table>`;
 
-  const withNone = rows.filter((r) => r.counts && !Object.values(r.counts).some((n) => n > 0)).length;
-  const notes = [];
-  if (hasAny.length) notes.push(`${hasAny.length} campground(s) with openings; ${withNone} fully booked in this window.`);
-  else notes.push(`No openings found — all ${checked} checked campgrounds are booked for this window.`);
-  if (totalReservable > checked) notes.push(`Checked the nearest ${checked} reservable of ${totalReservable}.`);
-  if (errored.length) notes.push(`${errored.length} campground(s) couldn't be reached.`);
+  notes.unshift(`${hasAny.length} campground(s) with openings; ${withNone} fully booked in this window.`);
   html += `<div class="hint">${notes.join(" ")}</div>`;
-
   els.availMatrix.innerHTML = html;
   setStatus(els.availStatus, "", "");
 }
